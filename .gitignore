@@ -1,0 +1,7 @@
+__pycache__
+dataset
+hw6.pdf
+*.pickle
+*.log
+*.csv
+*.png
