@@ -1,0 +1,1 @@
+Run `python3 -O nn.py` to train. Edit the `make_net` function to change network topology and hyperparameters. Run `plot.py` for a plot of current training progress.

@@ -27,9 +27,9 @@ class FullyConnectedLayer:
 
     def forward_pass(self, inputs):
         assert inputs.shape[0] == self.num_input
-        inputs = np.insert(inputs, len(inputs), 1, axis=0)
-        self.inputs = inputs
-        outputs = np.dot(self.weights, inputs) 
+        inputs_with_bias = np.insert(inputs, len(inputs), 1, axis=0)
+        self.inputs = inputs_with_bias
+        outputs = np.dot(self.weights, inputs_with_bias) 
         assert outputs.shape[0] == self.num_output
         return outputs
 
@@ -44,15 +44,36 @@ class FullyConnectedLayer:
 
 class BatchNormLayer:
 
-    alpha = 0.000000001
+    alpha = 0.0000001
+
+    def __init__(self, num_input):
+        self.total_means = np.zeros((num_input,))
+        self.total_stddevs = np.zeros((num_input,))
+        self.total = 0
 
     def forward_pass(self, inputs):
-        self.means = np.mean(inputs, axis=1)
-        self.stddevs = np.std(inputs, axis=1)
-        return (inputs - self.means) / (self.stddevs + self.alpha)
+        self.inputs = inputs
+        if len(inputs.shape) > 1:
+            self.means = np.mean(inputs, axis=1)
+            self.stddevs = np.std(inputs, axis=1)
+            self.total_means += self.means
+            self.total_stddevs += self.stddevs
+            self.total += 1
+            self.means = self.means[None].T
+            self.stddevs = self.stddevs[None].T
+        else:
+            self.means = self.total_means / self.total
+            self.stddevs = self.total_stddevs / self.total
+        ret = (inputs - self.means) / (self.stddevs + self.alpha) # TODO: optimize
+        assert ret.shape == inputs.shape
+        trace()
+        return ret
 
-    def backward_pass(self, prev_gradient):
-        return prev_gradient / self.stddevs
+    def backward_pass(self, prev_gradient): # NOT ACCURATE, TODO
+        # stddev_grad = (self.inputs - self.means)
+        ret = prev_gradient / self.stddevs
+        assert ret.shape == prev_gradient.shape
+        return ret
 
 
 class BatchNormScaleLayer:
@@ -66,18 +87,13 @@ class BatchNormScaleLayer:
         return inputs * self.scale + self.bias
 
     def backward_pass(self, prev_gradient):
+        next_gradient = prev_gradient * self.scale
         self.bias = self.bias * (1 - self.learning_rate * self.decay) - self.learning_rate * np.sum(prev_gradient)
         self.scale = self.scale * (1 - self.learning_rate * self.decay) - self.learning_rate * np.sum(np.multiply(self.inputs, prev_gradient))
-        return prev_gradient
+        return next_gradient
 
 
-class ActivationLayer:
-    
-    def __init__(self, *, num_input):
-        self.num_input = num_input
-
-
-class SigmoidLayer(ActivationLayer):
+class SigmoidLayer:
 
     def forward_pass(self, inputs):
         inputs = np.exp(-inputs)
@@ -90,7 +106,7 @@ class SigmoidLayer(ActivationLayer):
         return np.multiply(prev_gradient, gradient)
 
 
-class TanhLayer(ActivationLayer):
+class TanhLayer:
     
     def forward_pass(self, inputs):
         outputs = np.tanh(inputs)
@@ -203,6 +219,7 @@ class NeuralNetwork:
     def train_samples(self, start, end):
         features = self.train_data[start:end].T
         labels = self.train_labels[start:end]
+        assert features.shape[1]
         features = self.forward_pass(features)
         loss = self.loss.forward_pass(features, labels)
         gradient = self.loss.backward_pass()
@@ -265,11 +282,9 @@ class NeuralNetwork:
 def make_net():
     layers = [
         FullyConnectedLayer(num_input=784, num_output=200),
-        BatchNormLayer(),
-        BatchNormScaleLayer(),
-        TanhLayer(num_input=200),
+        TanhLayer(),
         FullyConnectedLayer(num_input=200, num_output=10),
-        SigmoidLayer(num_input=10),
+        SigmoidLayer(),
     ]
     batch_1_lr = {
         'decay': 0.0008,
@@ -280,7 +295,7 @@ def make_net():
         3600000: 0.001,
     }
     batch_200_lr = {
-        'decay': 0.003,
+        'decay': 0.0003,
               0: 0.005,
            2000: 0.004,
           24000: 0.003,

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 def plot(logfile='train.log'):
     x, loss, train, val_x, val = [], [], [], [], []
-    regex = re.compile(r'^ *(\d+)k - loss: ([\d\.]+) - train: ([\d\.]+)( - val: ([\d\.]+))? *\n?')
+    regex = re.compile(r'^ *(\d+)k? - loss: ([\d\.]+) - train: ([\d\.]+)( - val: ([\d\.]+))? *\n?')
     with open(logfile) as f:
         for i, line in enumerate(f):
             match = regex.match(line)
